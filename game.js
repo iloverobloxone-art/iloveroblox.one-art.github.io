@@ -10,10 +10,10 @@ const WOOL_FILES = {
   "yellow": "assets/wool_yellow.png"
 };
 const BED_FILES = {
-  "red": "assets/bed_red.png",
-  "blue": "assets/bed_blue.png",
-  "green": "assets/bed_green.png",
-  "yellow": "assets/bed_yellow.png"
+  "red": "assets/red_bed.png",
+  "blue": "assets/blue_bed.png",
+  "green": "assets/green_bed.png",
+  "yellow": "assets/yellow_bed.png"
 };
 const DEFAULT_SKIN = "assets/player_red.png"; // fallback
 

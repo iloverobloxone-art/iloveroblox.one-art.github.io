@@ -115,4 +115,31 @@ function animate() {
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
 }
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // Inside your game.js
+  const socket = io();
+
+  socket.on('init', data => {
+      // Set up your player, team, etc. from data
+  });
+
+  // When player moves, emits position
+  function sendMovement(pos) {
+      socket.emit('move', pos);
+  }
+  // When player places block
+  function placeBlock(team, position) {
+      socket.emit('place-block', { team, position });
+  }
+  // Listen for other players
+  socket.on('player-move', data => {
+      // Update their avatar/block in scene
+  });
+  socket.on('update-block', data => {
+      // Add block to scene
+  });
+  // ...more events
+</script>
+
 animate();

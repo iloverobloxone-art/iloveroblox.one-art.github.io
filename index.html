@@ -7,54 +7,6 @@
   <body>
     <script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.152/examples/js/controls/PointerLockControls.js"></script>
-    <script>
-      // Basic Three.js setup
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-      const renderer = new THREE.WebGLRenderer();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
-
-      // Simple floor and a "bed" as a colored cube
-      const floorGeometry = new THREE.BoxGeometry(20, 1, 20);
-      const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
-      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-      floor.position.y = -1;
-      scene.add(floor);
-
-      // Bed (red team)
-      const bedGeometry = new THREE.BoxGeometry(2, 1, 3);
-      const bedMaterial = new THREE.MeshLambertMaterial({ color: 0xff3333 });
-      const bed = new THREE.Mesh(bedGeometry, bedMaterial);
-      bed.position.set(2, 0.5, 2);
-      scene.add(bed);
-
-      // Wool block (red team) example
-      const woolGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const woolMaterialRed = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-      const woolBlock = new THREE.Mesh(woolGeometry, woolMaterialRed);
-      woolBlock.position.set(5, 0.5, 2);
-      scene.add(woolBlock);
-
-      // Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-      scene.add(ambientLight);
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(10, 10, 10);
-      scene.add(directionalLight);
-
-      // Camera controls (PointerLock for FPS movement)
-      let controls = new THREE.PointerLockControls(camera, renderer.domElement);
-      camera.position.y = 2;
-      camera.position.z = 8;
-      document.body.addEventListener('click', () => controls.lock());
-
-      // Animation/render loop
-      function animate() {
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
-      }
-      animate();
-    </script>
+    <script src="game.js"></script>
   </body>
 </html>

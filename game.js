@@ -1,227 +1,118 @@
-// game.js
-let canvas = document.getElementById('game');
-let ctx = canvas.getContext('2d');
+// World setup
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-const TEAM_COLORS = ["red", "blue", "green", "yellow"];
-const WOOL_FILES = {
-  "red": "assets/red_wool.png",
-  "blue": "assets/blue_wool.png",
-  "green": "assets/green_wool.png",
-  "yellow": "assets/yellow_wool.png"
-};
-const BED_FILES = {
-  "red": "assets/bed_red.png",
-  "blue": "assets/bed_blue.png",
-  "green": "assets/bed_green.png",
-  "yellow": "assets/bed_yellow.png"
-};
-const ITEM_ICONS = {
-  "iron": "assets/iron.png",
-  "gold": "assets/gold.png",
-  "diamond": "assets/diamond.png",
-  "sword_iron": "assets/iron_sword.png",
-  "fireball": "assets/fireball.png",
-  "tnt": "assets/tnt.png"
+const TEAM_COLORS = {red: 0xff3333, blue: 0x3366ff, green: 0x33ff66, yellow: 0xffee33};
+const TEAM_BED_POSITIONS = {
+    red: [5, 0.5, 5],
+    blue: [-5, 0.5, 5],
+    green: [-5, 0.5, -5],
+    yellow: [5, 0.5, -5]
 };
 
-let assets = {};
-let gameState = {
-  players: [],
-  teams: [],
-  blocks: [],
-  resources: [],
-  merchants: [
-    {type: "personal", x: 420, y: 300, color: "#ffa500"},
-    {type: "team", x: 480, y: 300, color: "#00ffd0"}
-  ],
-  mode: "singleplayer",
-  diamonds: [],
-};
+// Floor
+const floorGeometry = new THREE.BoxGeometry(30, 1, 30);
+const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+floor.position.y = -1;
+scene.add(floor);
 
-function loadAssets(callback) {
-  let toLoad = [];
-  for (let color of TEAM_COLORS) {
-    toLoad.push(WOOL_FILES[color]);
-    toLoad.push(BED_FILES[color]);
-  }
-  Object.values(ITEM_ICONS).forEach(p => toLoad.push(p));
-  let loaded = 0;
-  toLoad.forEach(path => {
-    let img = new Image();
-    img.src = path;
-    img.onload = () => {
-      assets[path] = img;
-      loaded++;
-      if (loaded === toLoad.length) callback();
-    };
-  });
+// Beds
+const beds = {};
+for (const team in TEAM_COLORS) {
+    const bedGeometry = new THREE.BoxGeometry(2, 1, 3);
+    const bedMaterial = new THREE.MeshLambertMaterial({ color: TEAM_COLORS[team] });
+    const bed = new THREE.Mesh(bedGeometry, bedMaterial);
+    const pos = TEAM_BED_POSITIONS[team];
+    bed.position.set(...pos);
+    scene.add(bed);
+    beds[team] = bed;
 }
 
-function createTeams() {
-  gameState.teams = TEAM_COLORS.map((color, i) => ({
-    name: color,
-    bed: {x: 100 + 700 * (i % 2), y: 100 + 400 * Math.floor(i / 2), color: color},
-    wool: WOOL_FILES[color],
-    bedImg: BED_FILES[color],
-    blocks: [],
-    upgrades: {protection: false},
-    diamonds: 0
-  }));
+// Wool blocks for each team
+function createWool(team, x, z) {
+    const woolGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const woolMaterial = new THREE.MeshLambertMaterial({ color: TEAM_COLORS[team] });
+    const block = new THREE.Mesh(woolGeometry, woolMaterial);
+    block.position.set(x, 0.5, z);
+    scene.add(block);
+    return block;
 }
+// Example: spawn some wool blocks
+createWool('red', 7, 5);
+createWool('blue', -7, 5);
+createWool('green', -5, -7);
+createWool('yellow', 5, -7);
 
-function addPlayer(username, teamIdx, bot = false) {
-  let team = gameState.teams[teamIdx];
-  let player = {
-    name: username,
-    team: team.name,
-    x: team.bed.x, y: team.bed.y,
-    alive: true,
-    hasBed: true,
-    inventory: {wool: 16, sword: 1, iron: 0, gold: 0, fireball: 0, tnt: 0},
-    bot: bot
-  };
-  gameState.players.push(player);
-  return player;
+// Resources
+function createResource(color, x, z) {
+    const geo = new THREE.SphereGeometry(0.5, 16, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: color });
+    const sphere = new THREE.Mesh(geo, mat);
+    sphere.position.set(x, 1, z);
+    scene.add(sphere);
+    return sphere;
 }
+// Iron, gold, diamond spawns
+createResource(0xd8d8d8, 0, 0);      // iron center
+createResource(0xffcc00, 0, 10);     // gold near red/blue
+createResource(0x44f0ff, 9, 0);      // diamond near yellow
 
-function placeBlock(x, y, player) {
-  let color = player.team;
-  gameState.blocks.push({x, y, color, img: WOOL_FILES[color], placedBy: player.name});
+// Shop cubes
+function createShop(x, z, label, color = 0xf7931a) {
+    const shopGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+    const shopMat = new THREE.MeshLambertMaterial({ color: color });
+    const shopBlock = new THREE.Mesh(shopGeo, shopMat);
+    shopBlock.position.set(x, 0.75, z);
+    scene.add(shopBlock);
+    return shopBlock;
 }
+createShop(4, 0, 'Shop');
+createShop(0, 4, 'Upgrades', 0x29f793);
 
-function destroyBed(bedColor) {
-  let team = gameState.teams.find(t => t.name === bedColor);
-  if (team && !team.bed.destroyed) {
-    team.bed.destroyed = true;
-    gameState.players.forEach(p => { if (p.team === bedColor) p.hasBed = false; });
-  }
-}
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(20, 40, 20);
+scene.add(directionalLight);
 
-function openShop(player) {
-  // Cheaper item prices
-  if (player.inventory.iron >= 2) { player.inventory.wool += 12; player.inventory.iron -= 2; }
-  if (player.inventory.gold >= 2) { player.inventory.sword = 2; player.inventory.gold -= 2; }
-  if (player.inventory.gold >= 3) { player.inventory.fireball += 1; player.inventory.gold -= 3; }
-}
+// Camera & Controls (Pointer Lock)
+const controls = new THREE.PointerLockControls(camera, renderer.domElement);
+camera.position.set(0, 2, 15);
 
-function openTeamUpgradeShop(team) {
-  if (team.diamonds >= 2 && !team.upgrades.protection) { team.upgrades.protection = true; team.diamonds -= 2; }
-}
+document.body.addEventListener('click', () => controls.lock());
 
-function botBehavior(bot) {
-  bot.x += Math.random() > 0.5 ? 1 : -1;
-  bot.y += Math.random() > 0.5 ? 1 : -1;
-  if (bot.inventory.wool > 0 && Math.random() < 0.02) { placeBlock(bot.x, bot.y, bot); bot.inventory.wool--; }
-  for (let team of gameState.teams) {
-    if (team.name !== bot.team && !team.bed.destroyed && Math.abs(bot.x - team.bed.x) < 30 && Math.abs(bot.y - team.bed.y) < 30) {
-      destroyBed(team.name);
+// Minimal movement logic
+let velocity = new THREE.Vector3();
+const moveState = { forward: false, back: false, left: false, right: false };
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyW') moveState.forward = true;
+    if (e.code === 'KeyS') moveState.back = true;
+    if (e.code === 'KeyA') moveState.left = true;
+    if (e.code === 'KeyD') moveState.right = true;
+});
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyW') moveState.forward = false;
+    if (e.code === 'KeyS') moveState.back = false;
+    if (e.code === 'KeyA') moveState.left = false;
+    if (e.code === 'KeyD') moveState.right = false;
+});
+
+function animate() {
+    if (controls.isLocked) {
+        velocity.set(0, 0, 0);
+        if (moveState.forward) velocity.z -= 0.2;
+        if (moveState.back) velocity.z += 0.2;
+        if (moveState.left) velocity.x -= 0.2;
+        if (moveState.right) velocity.x += 0.2;
+        controls.moveRight(velocity.x);
+        controls.moveForward(velocity.z);
     }
-  }
-  let m = gameState.merchants[0];
-  if (bot.inventory.wool <= 0 && Math.abs(bot.x - m.x) < 40 && Math.abs(bot.y - m.y) < 40) {
-    bot.inventory.iron += 2;
-    openShop(bot);
-  }
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
 }
-
-function collectDiamonds(player) {
-  for (let i = 0; i < gameState.diamonds.length; i++) {
-    let d = gameState.diamonds[i];
-    if (Math.abs(player.x - d.x) < 18 && Math.abs(player.y - d.y) < 18) {
-      let team = gameState.teams.find(t => t.name === player.team);
-      team.diamonds++;
-      gameState.diamonds.splice(i, 1);
-      i--;
-    }
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // Beds
-  gameState.teams.forEach(t => {
-    if (!t.bed.destroyed) ctx.drawImage(assets[t.bedImg], t.bed.x - 16, t.bed.y - 16, 32, 32);
-  });
-  // Blocks/wool
-  gameState.blocks.forEach(b => ctx.drawImage(assets[b.img], b.x - 8, b.y - 8, 16, 16));
-  // Merchants as circles
-  gameState.merchants.forEach(m => {
-    ctx.beginPath();
-    ctx.arc(m.x, m.y, 16, 0, 2 * Math.PI);
-    ctx.fillStyle = m.color;
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.stroke();
-    ctx.font = "11px Segoe UI";
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.fillText(m.type === "personal" ? "Shop" : "Upgrades", m.x, m.y + 28);
-  });
-  // Diamonds
-  gameState.diamonds.forEach(d => ctx.drawImage(assets[ITEM_ICONS["diamond"]], d.x - 8, d.y - 8, 16, 16));
-  // HUD info
-  ctx.font = "16px Segoe UI";
-  ctx.textAlign = "left";
-  gameState.players.forEach((p, idx) => {
-    ctx.fillStyle = p.alive ? "#fff" : "#999";
-    ctx.fillText(`${p.name} [${p.team}] Wool:${p.inventory.wool} Iron:${p.inventory.iron} Gold:${p.inventory.gold} Fireball:${p.inventory.fireball} TNT:${p.inventory.tnt}`, 10, 24 + idx * 24);
-  });
-  ctx.textAlign = "right";
-  gameState.teams.forEach((t, idx) => {
-    ctx.fillStyle = "#fff";
-    ctx.fillText(`[${t.name}] Diamonds:${t.diamonds} Protect:${t.upgrades.protection?"Y":"N"}`, 890, 24 + idx*24);
-  });
-}
-
-function tick() {
-  gameState.players.filter(p => p.bot).forEach(botBehavior);
-  gameState.players.forEach(collectDiamonds);
-  draw();
-  requestAnimationFrame(tick);
-}
-
-function spawnDiamonds() {
-  gameState.diamonds = [
-    {x: 450, y: 70}, {x: 450, y: 530}, {x: 140, y: 300}, {x: 760, y: 300}
-  ];
-}
-
-function startSingleplayer() {
-  gameState.players = [];
-  createTeams();
-  addPlayer("You", 0, false);
-  for (let i = 1; i < TEAM_COLORS.length; i++) { addPlayer(`Bot${i}`, i, true); }
-  gameState.mode = "singleplayer";
-  spawnDiamonds();
-  loadAssets(tick);
-}
-
-function startMultiplayer() {
-  gameState.players = [];
-  createTeams();
-  addPlayer("Player1", 0, false);
-  addPlayer("Player2", 1, false);
-  gameState.mode = "multiplayer";
-  spawnDiamonds();
-  loadAssets(tick);
-}
-
-window.startSingleplayer = startSingleplayer;
-window.startMultiplayer = startMultiplayer;
-
-// Simple merchant interaction: click near merchant to open shop or upgrade
-canvas.onclick = function(e) {
-  let rect = canvas.getBoundingClientRect();
-  let mx = e.clientX - rect.left, my = e.clientY - rect.top;
-  for (let m of gameState.merchants) {
-    if (Math.abs(mx - m.x) < 30 && Math.abs(my - m.y) < 30) {
-      let player = gameState.players.find(p => p.name === "You");
-      if (!player) return;
-      if (m.type === "personal") openShop(player);
-      if (m.type === "team") {
-        let team = gameState.teams.find(t => t.name === player.team);
-        openTeamUpgradeShop(team);
-      }
-    }
-  }
-};
+animate();

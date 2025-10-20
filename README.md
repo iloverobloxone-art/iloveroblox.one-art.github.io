@@ -1,2 +1,3 @@
 This is My Doors Project
-No Copyright
+
+Feel Free to use is whenever you want
